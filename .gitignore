@@ -7,3 +7,7 @@ corpora/
 *.sqlite
 __pycache__/
 .venv/
+xmls/
+*.clatin
+cyberlatin-cli/target/
+
