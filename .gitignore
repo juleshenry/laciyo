@@ -1,0 +1,9 @@
+data/
+lexicons/
+corpora/
+*.csv
+*.txt
+*.json
+*.sqlite
+__pycache__/
+.venv/
