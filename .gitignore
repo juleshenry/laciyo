@@ -11,3 +11,5 @@ xmls/
 *.clatin
 cyberlatin-cli/target/
 
+Archive.zip
+*.zip
