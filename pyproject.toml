@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "laciyo"
+version = "0.1.0"
+description = "Laciyo – Latin Cyber Creole conlang toolkit"
+readme = "README.md"
+requires-python = ">=3.10"
+
+[project.scripts]
+laciyo = "laciyo.__main__:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

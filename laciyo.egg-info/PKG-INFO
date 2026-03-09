@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: laciyo
+Version: 0.1.0
+Summary: Laciyo – Latin Cyber Creole conlang toolkit
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Dynamic: requires-python
+
+# laciyo
+Latin Cyber Creole
