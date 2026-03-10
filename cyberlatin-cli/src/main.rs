@@ -1,7 +1,8 @@
 use clap::Parser;
 use cyberlatin_cli::{
-    compute_energy, format_output, generate_legal_endings, init_genome, mutate,
-    phonemes_to_ortho, verb_slots, PipelineInput, Genome, EnergyBreakdown,
+    compute_energy, format_output, generate_legal_endings, init_genome,
+    mutate_in_place, undo_mutation,
+    phonemes_to_ortho, verb_slots, PipelineInput, EnergyCache,
     NOUN_SLOTS, ADJ_SLOTS,
 };
 use indicatif::{ProgressBar, ProgressStyle};
@@ -46,7 +47,108 @@ struct Cli {
     seed: u64,
 }
 
-fn print_summary(genome: &Genome, breakdown: &EnergyBreakdown, iterations: u64, accepted: u64) {
+fn main() {
+    let cli = Cli::parse();
+
+    // Load candidates
+    println!("Loading candidates from {}...", cli.input);
+    let json_str = fs::read_to_string(&cli.input)
+        .unwrap_or_else(|e| { eprintln!("Failed to read {}: {}", cli.input, e); std::process::exit(1); });
+    let input: PipelineInput = serde_json::from_str(&json_str)
+        .unwrap_or_else(|e| { eprintln!("Failed to parse JSON {}: {}", cli.input, e); std::process::exit(1); });
+
+    println!("  {} concepts loaded", input.concepts.len());
+
+    // Generate legal endings pool
+    let legal_endings = generate_legal_endings();
+    println!("  {} legal 1-syllable endings in pool", legal_endings.len());
+
+    // Init RNG, genome, candidate DB
+    let mut rng = StdRng::seed_from_u64(cli.seed);
+    let (mut genome, db) = init_genome(&input, &legal_endings, &mut rng);
+    let mut cache = EnergyCache::from_genome(&genome, &db);
+    let mut energy = cache.energy();
+
+    // Keep track of best state
+    let mut best_genome = genome.clone();
+    let mut best_energy = energy;
+
+    println!("  Initial energy: {:.0}", energy);
+    println!("\nRunning simulated annealing ({} iterations)...\n", cli.iterations);
+
+    // Progress bar
+    let pb = ProgressBar::new(cli.iterations);
+    pb.set_style(
+        ProgressStyle::with_template(
+            "  {spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) E={msg}"
+        )
+        .unwrap()
+        .progress_chars("█▓▒░  "),
+    );
+
+    let mut temp = cli.temp;
+    let mut accepted = 0u64;
+    let mut iterations = 0u64;
+
+    for it in 0..cli.iterations {
+        if temp < cli.min_temp {
+            iterations = it;
+            break;
+        }
+
+        // Mutate in place, get undo info
+        let undo = mutate_in_place(&mut genome, &db, &mut cache, &legal_endings, &mut rng);
+        let new_energy = cache.energy();
+        let delta = new_energy - energy;
+
+        if delta < 0.0 || rand::Rng::gen::<f64>(&mut rng) < (-delta / temp).exp() {
+            // Accept
+            energy = new_energy;
+            accepted += 1;
+
+            if energy < best_energy {
+                best_genome = genome.clone();
+                best_energy = energy;
+            }
+        } else {
+            // Reject — undo the mutation
+            undo_mutation(&mut genome, &db, &mut cache, undo);
+        }
+
+        temp *= cli.cooling;
+        iterations = it + 1;
+
+        if it % 10000 == 0 {
+            pb.set_position(it);
+            pb.set_message(format!("{:.0}", best_energy));
+        }
+    }
+
+    pb.set_position(iterations);
+    pb.set_message(format!("{:.0}", best_energy));
+    pb.finish_with_message(format!("DONE — best energy: {:.0}", best_energy));
+
+    // Final energy breakdown for output
+    let breakdown = compute_energy(&best_genome, &db);
+
+    // Output
+    let output = format_output(&best_genome, &db, &breakdown, iterations, accepted);
+    let json_out = serde_json::to_string_pretty(&output).expect("Failed to serialize output");
+    fs::write(&cli.output, &json_out)
+        .unwrap_or_else(|e| { eprintln!("Failed to write {}: {}", cli.output, e); std::process::exit(1); });
+    println!("\n  Output written to {}", cli.output);
+
+    // Print summary
+    print_summary(&best_genome, &db, &breakdown, iterations, accepted);
+}
+
+fn print_summary(
+    genome: &cyberlatin_cli::Genome,
+    db: &cyberlatin_cli::CandidateDB,
+    breakdown: &cyberlatin_cli::EnergyBreakdown,
+    iterations: u64,
+    accepted: u64,
+) {
     let n = genome.n_concepts();
 
     println!("\n{}", "═".repeat(70));
@@ -71,7 +173,7 @@ fn print_summary(genome: &Genome, breakdown: &EnergyBreakdown, iterations: u64, 
     let mut total_syls = 0u64;
     let mut total_viols = 0u64;
     for i in 0..n {
-        let r = genome.get_root(i);
+        let r = genome.get_root(i, db);
         *syl_dist.entry(r.syllables).or_insert(0) += 1;
         total_syls += r.syllables as u64;
         total_viols += r.violations as u64;
@@ -99,7 +201,7 @@ fn print_summary(genome: &Genome, breakdown: &EnergyBreakdown, iterations: u64, 
         }
     }
 
-    // Verb endings (indicative present only for display)
+    // Verb endings (present indicative only for display)
     let v_slots = verb_slots();
     println!("\n  Verb endings (present indicative):");
     for (ci, cls) in genome.verb_endings.iter().enumerate() {
@@ -121,7 +223,7 @@ fn print_summary(genome: &Genome, breakdown: &EnergyBreakdown, iterations: u64, 
     println!("\n  Sample roots (30 shortest):");
     let mut root_info: Vec<(String, u32, String, String)> = (0..n)
         .map(|i| {
-            let r = genome.get_root(i);
+            let r = genome.get_root(i, db);
             (r.orthography.clone(), r.syllables, r.source_lang.clone(), r.source_word.clone())
         })
         .collect();
@@ -130,98 +232,18 @@ fn print_summary(genome: &Genome, breakdown: &EnergyBreakdown, iterations: u64, 
         println!("    {:12}  ({}σ)  ← {}:{}", ortho, syls, lang, src);
     }
 
-    println!("\n{}", "═".repeat(70));
-}
-
-fn main() {
-    let cli = Cli::parse();
-
-    // Load candidates
-    println!("Loading candidates from {}...", cli.input);
-    let json_str = fs::read_to_string(&cli.input)
-        .unwrap_or_else(|e| { eprintln!("Failed to read {}: {}", cli.input, e); std::process::exit(1); });
-    let input: PipelineInput = serde_json::from_str(&json_str)
-        .unwrap_or_else(|e| { eprintln!("Failed to parse JSON {}: {}", cli.input, e); std::process::exit(1); });
-
-    println!("  {} concepts loaded", input.concepts.len());
-
-    // Generate legal endings pool
-    let legal_endings = generate_legal_endings();
-    println!("  {} legal 1-syllable endings in pool", legal_endings.len());
-
-    // Init RNG and genome
-    let mut rng = StdRng::seed_from_u64(cli.seed);
-    let mut genome = init_genome(&input, &legal_endings, &mut rng);
-    let mut breakdown = compute_energy(&genome);
-    let mut energy = breakdown.total;
-
-    let mut best_genome = genome.clone();
-    let mut best_breakdown = breakdown.clone();
-    let mut best_energy = energy;
-
-    println!("  Initial energy: {:.0}", energy);
-    println!("\nRunning simulated annealing ({} iterations)...\n", cli.iterations);
-
-    // Progress bar
-    let pb = ProgressBar::new(cli.iterations);
-    pb.set_style(
-        ProgressStyle::with_template(
-            "  {spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) E={msg}"
-        )
-        .unwrap()
-        .progress_chars("█▓▒░  "),
-    );
-
-    let mut temp = cli.temp;
-    let mut accepted = 0u64;
-    let mut iterations = 0u64;
-
-    for it in 0..cli.iterations {
-        if temp < cli.min_temp {
-            iterations = it;
-            break;
-        }
-
-        // Mutate
-        let mut new_genome = genome.clone();
-        mutate(&mut new_genome, &legal_endings, &mut rng);
-        let new_breakdown = compute_energy(&new_genome);
-        let new_energy = new_breakdown.total;
-
-        let delta = new_energy - energy;
-
-        if delta < 0.0 || rand::Rng::gen::<f64>(&mut rng) < (-delta / temp).exp() {
-            genome = new_genome;
-            breakdown = new_breakdown;
-            energy = new_energy;
-            accepted += 1;
-
-            if energy < best_energy {
-                best_genome = genome.clone();
-                best_breakdown = breakdown.clone();
-                best_energy = energy;
-            }
-        }
-
-        temp *= cli.cooling;
-        iterations = it + 1;
-
-        if it % 5000 == 0 {
-            pb.set_position(it);
-            pb.set_message(format!("{:.0}", best_energy));
+    // Emergent phoneme inventory
+    let mut all_phonemes: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for i in 0..n {
+        let r = genome.get_root(i, db);
+        for p in &r.lacyo_phonemes {
+            all_phonemes.insert(p.clone());
         }
     }
+    let mut inv: Vec<&String> = all_phonemes.iter().collect();
+    inv.sort();
+    println!("\n  Emergent phoneme inventory ({} phonemes):", inv.len());
+    println!("    {}", inv.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(" "));
 
-    pb.set_position(iterations);
-    pb.set_message(format!("{:.0}", best_energy));
-    pb.finish_with_message(format!("DONE — best energy: {:.0}", best_energy));
-
-    // Output
-    let output = format_output(&best_genome, &best_breakdown, iterations, accepted);
-    let json_out = serde_json::to_string_pretty(&output).expect("Failed to serialize output");
-    fs::write(&cli.output, &json_out)
-        .unwrap_or_else(|e| { eprintln!("Failed to write {}: {}", cli.output, e); std::process::exit(1); });
-    println!("\n  Output written to {}", cli.output);
-
-    print_summary(&best_genome, &best_breakdown, iterations, accepted);
+    println!("\n{}", "═".repeat(70));
 }

@@ -43,8 +43,12 @@ ONSET2: set[str] = {"l", "r", "j", "w"}
 # Obstruents that can occupy onset-1 in a cluster
 OBSTRUENTS: set[str] = {"p", "b", "t", "d", "k", "ɡ", "f", "v", "s"}
 
-# Legal codas
-LEGAL_CODAS: set[str] = {"n", "s", "r", "l"}
+# Legal codas — any single consonant is fine (naturalistic, respects Romance sources).
+# Coda clusters up to 2 are allowed if sonorant precedes obstruent (e.g. /ns/, /nd/, /st/, /rt/).
+LEGAL_SINGLE_CODAS: set[str] = CONSONANTS  # any consonant can close a syllable
+SONORANTS: set[str] = {"m", "n", "l", "r"}
+# For backwards compat (some old code may reference this)
+LEGAL_CODAS: set[str] = CONSONANTS
 
 # ---------------------------------------------------------------------------
 # Phoneme-to-orthography mapping (grammar.tex Table 2.5)
@@ -352,9 +356,15 @@ def count_violations(phoneme_seq: list[str]) -> int:
         onset = syl[:nuc_idx]
         coda = syl[nuc_idx + 1:]
 
-        # Constraint 1: No coda clusters (max 1 consonant in coda)
-        if len(coda) > 1:
-            violations += len(coda) - 1
+        # Constraint 1: Max 2 consonants in coda (3+ is a violation)
+        if len(coda) > 2:
+            violations += len(coda) - 2
+
+        # Constraint 1b: If coda cluster of 2, must be sonorant+obstruent
+        # (e.g. /ns/, /nd/, /rt/, /lk/) — natural in Romance
+        if len(coda) == 2:
+            if coda[0] not in SONORANTS:
+                violations += 1
 
         # Constraint 2: No onset triples (max 2 consonants in onset)
         if len(onset) > 2:
@@ -366,10 +376,8 @@ def count_violations(phoneme_seq: list[str]) -> int:
             if c1 not in OBSTRUENTS or c2 not in ONSET2:
                 violations += 1
 
-        # Constraint 4: Coda constraint (only n, s, r, l)
-        for c in coda:
-            if c not in LEGAL_CODAS:
-                violations += 1
+        # Constraint 4: Any single consonant is a legal coda (naturalistic).
+        # No restriction — Romance sources are respected.
 
     # Constraint 5: No gemination across syllable boundaries
     for i in range(len(syls) - 1):
