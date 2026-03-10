@@ -49,3 +49,50 @@ If your `local_optimal.clatin` achieves a lower Energy Score than the current gl
   If their score is lower, your node will permanently adopt their genome as the new baseline.
 
 Join the grid. Let's calculate a language.
+
+## Roadmap: From Grammar to Literature
+
+The development of Cyber-Latin (Lacyo) will follow a phased, methodical progression. We build from the mathematical and grammatical foundations up to complex literature and cultural expressions.
+
+### Phase 0: Grammar Consolidation
+Establish the definitive mathematical and structural constraints of the language.
+* **Outputs:** `docs/grammar/grammar.tex` (Reference specification) and accompanying codebase structures.
+* **Content:** Stemming selection rules, morpheme agglutination phases, global phoneme inventory, and collision avoidance logic.
+
+### Phase 1: Total Lexical Development
+Execute the simulated annealing engine across the full Wiktionary database.
+* **Outputs:** A stable, comprehensive `.clatin` genome covering a core 5,000+ word vocabulary.
+* **Content:** Extraction, scoring, and selection of words from French, Spanish, Italian, Portuguese, Romanian, etc.
+
+### Phase 2: Idioms & Phraseology
+Map the rich, multivaried idiomatic expressions of all base Romance languages into Cyber-Latin.
+* **Outputs:** `books/idioms/idioms.tex` (A comprehensive phrasebook).
+* **Content:** Translating metaphorical structures while adhering to agglutinative rules.
+
+### Phase 3: Text-Talk & Slang Guide
+Adapt internet chat conventions and abbreviations from modern Romance languages into a standardized Cyber-Latin digital shorthand.
+* **Outputs:** `books/text-talk/text-talk.tex` (A digital phrasebook/guide).
+* **Content:** Mapping "jaja" (ES), "rsrs" / "kkk" (PT), "mdr" (FR) to their mathematical equivalents.
+
+### Phase 4: Children's Book
+A simple, engaging narrative to demonstrate basic syntax and everyday vocabulary.
+* **Outputs:** `books/kids-book/kids-book.tex`.
+* **Content:** Original narrative focusing on elemental concepts.
+
+### Phase 5: Beginner's Didactic Guide
+A teaching resource using structured passages to introduce readers to the language systematically.
+* **Outputs:** `books/beginners-guide/beginners-guide.tex`.
+* **Content:** Gradual vocabulary introduction, grammar exercises, and annotated texts.
+
+### Phase 6: Core Translations (Foundational Texts)
+Translating culturally significant foundational works.
+* **Outputs:** `books/bible/bible.tex` (Full Bible translation).
+
+### Phase 7: World Literature Expansion
+Demonstrating the expressive capacity of Cyber-Latin across diverse literary styles from all major Romance branches, plus global classics.
+* **Alice in Wonderland:** `books/alice/alice.tex` (Full novel)
+* **Dante's Inferno (Italian):** `books/inferno/inferno.tex` (Selected cantos or full)
+* **Don Quixote (Spanish):** `books/don-quixote/don-quixote.tex`
+* **Os Lusiadas (Portuguese):** `books/lusiadas/lusiadas.tex`
+* **Le Petit Prince (French):** `books/petit-prince/petit-prince.tex`
+* **Miorita (Romanian):** `books/miorita/miorita.tex`
