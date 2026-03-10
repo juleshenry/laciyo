@@ -43,7 +43,7 @@ def fetch_category_pages(category_url: str, max_pages: int = 10) -> List[str]:
         logging.info(f"Fetching category page: {current_url}")
         
         try:
-            response = requests.get(current_url, headers=HEADERS, timeout=10)
+            response = requests.get(current_url, headers=HEADERS, timeout=30)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
             
@@ -92,7 +92,7 @@ def extract_morpheme_data(morpheme_url: str) -> Optional[Dict]:
     logging.info(f"Scraping morpheme: {morpheme_form}")
     
     try:
-        response = requests.get(full_url, headers=HEADERS, timeout=10)
+        response = requests.get(full_url, headers=HEADERS, timeout=30)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         
