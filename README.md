@@ -15,10 +15,46 @@ Natural languages are full of redundancy. We want a language that prioritizes:
 
 Because calculating the absolute perfect lexicon across 10,000+ words takes longer than the age of the universe, we need *your* computer to help us find better mathematical minimums.
 
-### Languages Included So Far
-* French
-* Italian
-* Spanish
+### Supported Languages (20 Languages, 19 Dumps)
+
+All lexical data is sourced from Wiktionary XML dumps (MediaWiki export v0.11). The corpus spans **20+ GB** of uncompressed XML across **20.8 million pages**.
+
+#### Romance Languages (18 Core)
+
+| Code | Language | Branch | Wiktionary | Dump | Size | Pages |
+|------|----------|--------|------------|------|------|------:|
+| `fr` | French | Gallo-Romance | Wiktionnaire | full | 7.3 GB | 7,287,012 |
+| `es` | Spanish | Ibero-Romance | Wikcionario | full | 967 MB | 982,019 |
+| `ca` | Catalan | Occitano-Romance | Viccionari | full | 509 MB | 623,165 |
+| `it` | Italian | Italo-Dalmatian | Wikizionario | full | 611 MB | 602,190 |
+| `pt` | Portuguese | Ibero-Romance | Wikcionario | full | 561 MB | 555,568 |
+| `ro` | Romanian | Eastern Romance | Wikționar | full | 216 MB | 197,244 |
+| `gl` | Galician | Ibero-Romance | Wiktionary | full | 109 MB | 104,869 |
+| `oc` | Occitan | Occitano-Romance | Wikiccionari | full | 103 MB | 86,776 |
+| `ast` | Asturian | Ibero-Romance | Wikcionariu | stub | 55 MB | 77,518 |
+| `wa` | Walloon | Gallo-Romance | Wiccionaire | full | 65 MB | 52,490 |
+| `la` | Latin | Classical ancestor | Victionarium | full | 68 MB | 49,332 |
+| `lmo` | Lombard | Gallo-Italic | Wiktionary | full | 64 MB | 37,855 |
+| `scn` | Sicilian | Italo-Dalmatian | Wikizziunariu | full | 30 MB | 23,872 |
+| `vec` | Venetian | Gallo-Italic | Wikisionario | full | 9.2 MB | 6,573 |
+| `an` | Aragonese | Ibero-Romance | Biquizionario | full | 5.2 MB | 5,450 |
+| `rup` | Aromanian | Eastern Romance | Wikționar | full | 1.6 MB | 1,583 |
+| `rm` | Romansh | Rhaeto-Romance | Wiktionary | full | 71 KB | 92 |
+| `sc` | Sardinian | Insular Romance | Wiktionary | full | 49 KB | 40 |
+
+#### Creoles & Contact Languages (via `enwiktionary` + Incubator)
+
+Languages without standalone Wiktionary dumps, extracted from `==Language==` sections in the English Wiktionary and scraped from the [Wikimedia Incubator](https://incubator.wikimedia.org/wiki/Wt/ht/).
+
+| Code | Language | Base | Branch | Sources |
+|------|----------|------|--------|---------|
+| `ht` | Haitian Creole | French-based | Atlantic Creole | `enwiktionary`, Incubator (`Wt/ht/`) |
+
+#### Reference Languages (Non-Romance)
+
+| Code | Language | Family | Wiktionary | Dump | Size | Pages |
+|------|----------|--------|------------|------|------|------:|
+| `en` | English | Germanic | Wiktionary | full | 10 GB | 9,943,880 |
 
 ## The Mechanics: How It Works
 The entire state of the Cyber-Latin language is stored in a highly compressed binary "genome" file (`.clatin`). 

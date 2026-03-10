@@ -1,73 +1,8 @@
-use rmp_serde;
 use clap::{Parser, Subcommand};
+use cyberlatin_cli::State;
 use rand::Rng;
-use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{Read, Write};
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-struct Candidate {
-    word: String,
-    syllables: u32,
-    phonemes: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-struct Concept {
-    id: String,
-    grammatical_class: String,
-    candidates: Vec<Candidate>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-struct State {
-    concepts: HashMap<String, Concept>,
-    // Mapping of Concept ID to the index of the chosen Candidate
-    choices: HashMap<String, usize>,
-    energy_score: u64,
-}
-
-impl State {
-    fn calculate_energy(&mut self) {
-        let mut total_syllables = 0;
-        let mut global_phonemes: HashSet<String> = HashSet::new();
-        let mut ar_stems: HashSet<String> = HashSet::new();
-        let mut er_stems: HashSet<String> = HashSet::new();
-        let mut ir_stems: HashSet<String> = HashSet::new();
-        let mut grammatical_collisions = 0;
-
-        for (concept_id, choice_idx) in &self.choices {
-            let concept = &self.concepts[concept_id];
-            let candidate = &concept.candidates[*choice_idx];
-
-            total_syllables += candidate.syllables;
-            for p in &candidate.phonemes {
-                global_phonemes.insert(p.clone());
-            }
-
-            // Simple collision check for stems based on class
-            if concept.grammatical_class == "verb-ar" {
-                if !ar_stems.insert(candidate.word.clone()) {
-                    grammatical_collisions += 1;
-                }
-            } else if concept.grammatical_class == "verb-er" {
-                if !er_stems.insert(candidate.word.clone()) {
-                    grammatical_collisions += 1;
-                }
-            } else if concept.grammatical_class == "verb-ir" {
-                if !ir_stems.insert(candidate.word.clone()) {
-                    grammatical_collisions += 1;
-                }
-            }
-        }
-
-        // Energy = (1000 * Syllables) + (10 * Phonemes) + (100000 * Collisions)
-        self.energy_score = (1000 * total_syllables as u64)
-            + (10 * global_phonemes.len() as u64)
-            + (100_000 * grammatical_collisions as u64);
-    }
-}
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -96,7 +31,10 @@ fn load_state(path: &str) -> State {
     let mut file = File::open(path).expect("Failed to open .clatin file");
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).expect("Failed to read file");
-    rmp_serde::from_slice(&buffer).expect("Failed to deserialize state")
+    let mut state: State = rmp_serde::from_slice(&buffer).expect("Failed to deserialize state");
+    // Calculate initial energy
+    state.calculate_energy();
+    state
 }
 
 fn save_state(state: &State, path: &str) {
@@ -107,7 +45,7 @@ fn save_state(state: &State, path: &str) {
 
 fn simulated_annealing(mut state: State) -> State {
     println!("Starting Simulated Annealing. Initial Energy: {}", state.energy_score);
-    let mut rng = rand::thread_crate();
+    let mut rng = rand::thread_rng();
     
     // Hyperparameters for Simulated Annealing
     let mut temperature = 10000.0;
