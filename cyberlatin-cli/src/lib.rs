@@ -189,8 +189,14 @@ pub fn count_violations(seq: &[String]) -> u32 {
         let onset = &syl[..nuc_idx];
         let coda = &syl[nuc_idx + 1..];
 
-        if coda.len() > 1 {
-            violations += (coda.len() - 1) as u32;
+        if coda.len() > 2 {
+            violations += (coda.len() - 2) as u32;
+        }
+        // Coda cluster of 2: sonorant + obstruent is natural in Romance
+        if coda.len() == 2 {
+            if !is_sonorant(coda[0]) {
+                violations += 1;
+            }
         }
         if onset.len() > 2 {
             violations += (onset.len() - 2) as u32;
@@ -200,11 +206,7 @@ pub fn count_violations(seq: &[String]) -> u32 {
                 violations += 1;
             }
         }
-        for c in coda {
-            if !is_legal_coda(c) {
-                violations += 1;
-            }
-        }
+        // Any single consonant is a legal coda — naturalistic
     }
 
     // No gemination across syllable boundaries

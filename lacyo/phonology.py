@@ -311,10 +311,9 @@ def syllabify(phoneme_seq: list[str]) -> list[list[str]]:
                     syllables[-1].extend(phoneme_seq[interlude_start:interlude_end - 1])
 
         # Determine end of this syllable
-        if si == len(vowel_positions) - 1:
-            end = len(phoneme_seq)
-        else:
-            end = vi + 1  # just the vowel for now; coda assigned in next iteration
+        # For the last vowel, we only go up to vi+1; trailing consonants
+        # are appended separately below to avoid double-counting.
+        end = vi + 1
 
         syl = phoneme_seq[start:end]
         syllables.append(syl)

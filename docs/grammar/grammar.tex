@@ -177,6 +177,27 @@ This is the \emph{candidate ceiling}. The optimizer's job is to find lexica
 that use as few of these 23 as possible. A lexicon using only 15 consonants
 and 5 vowels scores better than one using all 18+5.
 
+\subsection{Diphthongs}
+
+Diphthongs are \textbf{unit phonemes}, not sequences of two vowels.
+The following rising and falling diphthongs are attested in the Romance
+source data and available in the Lacyo search space:
+
+\begin{itemize}
+  \item \textbf{Rising} (glide + vowel): /ja/, /je/, /jo/, /ju/,
+        /wa/, /we/, /wi/, /wo/
+  \item \textbf{Falling} (vowel + glide): /aj/, /ej/, /oj/,
+        /aw/, /ew/, /ow/
+\end{itemize}
+
+\noindent Because diphthongs are unit phonemes, each occupies a single vowel
+nucleus slot $V$ in the syllable template. A word like /fwe/ (``fire'') is
+monosyllabic: $C V$, not $C V V$.
+
+In orthography, diphthongs are spelled as two characters matching their
+component phones: \texttt{ya}, \texttt{we}, \texttt{ay}, etc.
+The glides /j/ and /w/ are written \texttt{y} and \texttt{w} respectively.
+
 
 \section{Phonotactics}
 \label{sec:phonotactics}
@@ -186,7 +207,7 @@ and 5 vowels scores better than one using all 18+5.
 The maximal syllable template is:
 
 \begin{equation}
-\sigma = (C_1)(C_2) V (C_3)
+\sigma = (C_1)(C_2) V (C_3)(C_4)
 \end{equation}
 
 \noindent where:
@@ -194,7 +215,9 @@ The maximal syllable template is:
   \item $C_1$ (onset 1): any consonant or glide
   \item $C_2$ (onset 2): restricted to /l/, /r/, /j/, /w/ (liquids and glides only)
   \item $V$ (nucleus): any vowel
-  \item $C_3$ (coda): restricted to /n/, /s/, /r/, /l/ (sonorants and /s/ only)
+  \item $C_3$ (coda): any consonant. Coda clusters of two consonants are
+        permitted if the first is a sonorant (/m/, /n/, /l/, /r/) and the
+        second is an obstruent or /s/ (e.g.\ /ns/, /nd/, /rt/, /lk/).
 \end{itemize}
 
 \subsection{Legal Syllable Types}
@@ -213,17 +236,21 @@ Ordered by optimizer preference (lower energy first):
 \subsection{Phonotactic Constraints}
 
 \begin{enumerate}
-  \item \textbf{No coda clusters.} A syllable may end in at most one consonant.
+  \item \textbf{Coda clusters.} A syllable may end in one or two consonants.
+        Two-consonant codas must follow sonority sequencing: the first consonant
+        must be a sonorant (/m/, /n/, /l/, /r/). Three-consonant codas are
+        forbidden. This respects naturalistic Romance codas (e.g.\ /film/,
+        /dans/, /port/).
   \item \textbf{No onset triples.} Maximum two consonants in onset.
   \item \textbf{Onset cluster rule.} If $C_1 C_2$ onset, then $C_1$ must be
         an obstruent (p, b, t, d, k, g, f, v, s) and $C_2$ must be a
         liquid or glide (l, r, j, w).
-  \item \textbf{Coda constraint.} Only /n/, /s/, /r/, /l/ may appear in coda.
+  \item \textbf{Any single consonant is a legal coda.} Lacyo respects its
+        Romance source material: final stops, fricatives, nasals, and
+        liquids are all permitted (e.g.\ /xef/, /dat/, /mem/).
   \item \textbf{No gemination.} No doubled consonants across syllable boundaries.
   \item \textbf{No hiatus.} Adjacent vowels across syllable boundaries must be
         separated by an epenthetic glide or resolved by the optimizer.
-  \item \textbf{Word-final rule.} Words may end in a vowel or in /n/, /s/, /r/, /l/.
-        No other final consonants.
 \end{enumerate}
 
 \subsection{Stress}
