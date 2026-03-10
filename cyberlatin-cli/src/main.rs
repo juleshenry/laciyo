@@ -1,143 +1,227 @@
-use clap::{Parser, Subcommand};
-use cyberlatin_cli::State;
-use rand::Rng;
-use std::fs::File;
-use std::io::{Read, Write};
+use clap::Parser;
+use cyberlatin_cli::{
+    compute_energy, format_output, generate_legal_endings, init_genome, mutate,
+    phonemes_to_ortho, verb_slots, PipelineInput, Genome, EnergyBreakdown,
+    NOUN_SLOTS, ADJ_SLOTS,
+};
+use indicatif::{ProgressBar, ProgressStyle};
+use rand::rngs::StdRng;
+use rand::SeedableRng;
+use std::collections::HashMap;
+use std::fs;
 
 #[derive(Parser)]
-#[command(author, version, about, long_about = None)]
+#[command(
+    name = "lacyo",
+    version = "2.0",
+    about = "Lacyo — Simulated Annealing optimizer for a computationally designed fusional language"
+)]
 struct Cli {
-    #[command(subcommand)]
-    command: Commands,
+    /// Path to candidates JSON (output from Python pipeline)
+    #[arg(short, long)]
+    input: String,
+
+    /// Output JSON path
+    #[arg(short, long, default_value = "data/lacyo_lexicon.json")]
+    output: String,
+
+    /// Max SA iterations
+    #[arg(short = 'n', long, default_value_t = 2_000_000)]
+    iterations: u64,
+
+    /// Initial temperature
+    #[arg(long, default_value_t = 10_000.0)]
+    temp: f64,
+
+    /// Cooling rate
+    #[arg(long, default_value_t = 0.999_997)]
+    cooling: f64,
+
+    /// Minimum temperature
+    #[arg(long, default_value_t = 0.01)]
+    min_temp: f64,
+
+    /// Random seed
+    #[arg(short, long, default_value_t = 42)]
+    seed: u64,
 }
 
-#[derive(Subcommand)]
-enum Commands {
-    /// Start the Simulated Annealing engine
-    Start {
-        /// Path to the genesis or current .clatin file
-        #[arg(short, long)]
-        file: String,
-    },
-    /// Merge a peer's .clatin file
-    Merge {
-        /// Path to the peer's .clatin file
-        #[arg(short, long)]
-        peer_file: String,
-    },
-}
+fn print_summary(genome: &Genome, breakdown: &EnergyBreakdown, iterations: u64, accepted: u64) {
+    let n = genome.n_concepts();
 
-fn load_state(path: &str) -> State {
-    let mut file = File::open(path).expect("Failed to open .clatin file");
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer).expect("Failed to read file");
-    let mut state: State = rmp_serde::from_slice(&buffer).expect("Failed to deserialize state");
-    // Calculate initial energy
-    state.calculate_energy();
-    state
-}
+    println!("\n{}", "═".repeat(70));
+    println!("  LACYO LEXICON — OPTIMIZATION RESULT");
+    println!("{}", "═".repeat(70));
 
-fn save_state(state: &State, path: &str) {
-    let encoded = rmp_serde::to_vec(state).expect("Failed to serialize state");
-    let mut file = File::create(path).expect("Failed to create file");
-    file.write_all(&encoded).expect("Failed to write to file");
-}
+    println!("\n  Concepts:       {}", n);
+    println!("  Iterations:     {}", iterations);
+    println!("  Accept rate:    {:.1}%", if iterations > 0 { accepted as f64 / iterations as f64 * 100.0 } else { 0.0 });
+    println!("  Total energy:   {:.0}", breakdown.total);
 
-fn simulated_annealing(mut state: State) -> State {
-    println!("Starting Simulated Annealing. Initial Energy: {}", state.energy_score);
-    let mut rng = rand::thread_rng();
-    
-    // Hyperparameters for Simulated Annealing
-    let mut temperature = 10000.0;
-    let cooling_rate = 0.9999;
-    let min_temperature = 0.1;
-    let mut iteration = 0;
+    println!("\n  Energy breakdown:");
+    println!("    E_root       {:>12.0}", breakdown.e_root);
+    println!("    E_phon       {:>12.0}", breakdown.e_phon);
+    println!("    E_end        {:>12.0}", breakdown.e_end);
+    println!("    E_coll       {:>12.0}", breakdown.e_coll);
+    println!("    E_tact       {:>12.0}", breakdown.e_tact);
+    println!("    E_dist       {:>12.0}", breakdown.e_dist);
 
-    let concept_ids: Vec<String> = state.concepts.keys().cloned().collect();
-
-    if concept_ids.is_empty() {
-        println!("No concepts to optimize.");
-        return state;
+    // Syllable distribution
+    let mut syl_dist: HashMap<u32, usize> = HashMap::new();
+    let mut total_syls = 0u64;
+    let mut total_viols = 0u64;
+    for i in 0..n {
+        let r = genome.get_root(i);
+        *syl_dist.entry(r.syllables).or_insert(0) += 1;
+        total_syls += r.syllables as u64;
+        total_viols += r.violations as u64;
     }
 
-    let mut best_state = state.clone();
+    println!("\n  Root syllable distribution:");
+    let mut keys: Vec<u32> = syl_dist.keys().copied().collect();
+    keys.sort();
+    for s in &keys {
+        let count = syl_dist[s];
+        let pct = count as f64 / n as f64 * 100.0;
+        let bar: String = "█".repeat((pct / 2.0) as usize);
+        println!("    {} syl: {:>4} ({:>5.1}%) {}", s, count, pct, bar);
+    }
+    println!("    avg:  {:.2} syllables", total_syls as f64 / n as f64);
+    println!("    violations: {}", total_viols);
 
-    while temperature > min_temperature {
-        // Create a neighbor
-        let mut new_state = state.clone();
-        
-        // Pick a random concept to mutate
-        let random_concept_idx = rng.gen_range(0..concept_ids.len());
-        let concept_id = &concept_ids[random_concept_idx];
-        let concept = &new_state.concepts[concept_id];
-        
-        if concept.candidates.len() > 1 {
-            let mut new_choice = rng.gen_range(0..concept.candidates.len());
-            // Ensure we actually pick a different candidate if possible
-            while new_choice == new_state.choices[concept_id] {
-                new_choice = rng.gen_range(0..concept.candidates.len());
-            }
-            new_state.choices.insert(concept_id.clone(), new_choice);
-            new_state.calculate_energy();
-
-            let current_energy = state.energy_score;
-            let new_energy = new_state.energy_score;
-
-            // Decide whether to accept the neighbor
-            if new_energy < current_energy {
-                state = new_state; // Accept strictly better state
-                if state.energy_score < best_state.energy_score {
-                    best_state = state.clone();
-                    println!("Iteration {}: New best energy: {}", iteration, best_state.energy_score);
-                }
-            } else {
-                // Accept worse state with some probability
-                let acceptance_probability = ((current_energy as f64 - new_energy as f64) / temperature).exp();
-                if rng.gen::<f64>() < acceptance_probability {
-                    state = new_state;
-                }
-            }
-        }
-
-        temperature *= cooling_rate;
-        iteration += 1;
-        
-        if iteration % 10000 == 0 {
-            println!("Temp: {:.2}, Current Energy: {}", temperature, state.energy_score);
+    // Noun endings
+    println!("\n  Noun endings:");
+    for (ci, cls) in genome.noun_endings.iter().enumerate() {
+        println!("    class {}:", ci + 1);
+        for (si, seq) in cls.iter().enumerate() {
+            let slot = NOUN_SLOTS.get(si).unwrap_or(&"?");
+            println!("      {:8} → -{}", slot, phonemes_to_ortho(seq));
         }
     }
 
-    println!("Finished Simulated Annealing. Best Energy: {}", best_state.energy_score);
-    best_state
+    // Verb endings (indicative present only for display)
+    let v_slots = verb_slots();
+    println!("\n  Verb endings (present indicative):");
+    for (ci, cls) in genome.verb_endings.iter().enumerate() {
+        println!("    class {}:", ci + 1);
+        for (si, seq) in cls.iter().enumerate().take(6) {
+            let slot = v_slots.get(si).map(|s| s.as_str()).unwrap_or("?");
+            println!("      {:12} → -{}", slot, phonemes_to_ortho(seq));
+        }
+    }
+
+    // Adj endings
+    println!("\n  Adjective endings:");
+    for (si, seq) in genome.adj_endings.iter().enumerate() {
+        let slot = ADJ_SLOTS.get(si).unwrap_or(&"?");
+        println!("    {:8} → -{}", slot, phonemes_to_ortho(seq));
+    }
+
+    // Sample roots (shortest first)
+    println!("\n  Sample roots (30 shortest):");
+    let mut root_info: Vec<(String, u32, String, String)> = (0..n)
+        .map(|i| {
+            let r = genome.get_root(i);
+            (r.orthography.clone(), r.syllables, r.source_lang.clone(), r.source_word.clone())
+        })
+        .collect();
+    root_info.sort_by_key(|x| x.1);
+    for (ortho, syls, lang, src) in root_info.iter().take(30) {
+        println!("    {:12}  ({}σ)  ← {}:{}", ortho, syls, lang, src);
+    }
+
+    println!("\n{}", "═".repeat(70));
 }
 
 fn main() {
     let cli = Cli::parse();
 
-    match &cli.command {
-        Commands::Start { file } => {
-            println!("Loading genome from {}...", file);
-            let state = load_state(file);
-            let optimized_state = simulated_annealing(state);
-            let out_file = "local_optimal.clatin";
-            save_state(&optimized_state, out_file);
-            println!("Saved optimized genome to {}", out_file);
+    // Load candidates
+    println!("Loading candidates from {}...", cli.input);
+    let json_str = fs::read_to_string(&cli.input)
+        .unwrap_or_else(|e| { eprintln!("Failed to read {}: {}", cli.input, e); std::process::exit(1); });
+    let input: PipelineInput = serde_json::from_str(&json_str)
+        .unwrap_or_else(|e| { eprintln!("Failed to parse JSON {}: {}", cli.input, e); std::process::exit(1); });
+
+    println!("  {} concepts loaded", input.concepts.len());
+
+    // Generate legal endings pool
+    let legal_endings = generate_legal_endings();
+    println!("  {} legal 1-syllable endings in pool", legal_endings.len());
+
+    // Init RNG and genome
+    let mut rng = StdRng::seed_from_u64(cli.seed);
+    let mut genome = init_genome(&input, &legal_endings, &mut rng);
+    let mut breakdown = compute_energy(&genome);
+    let mut energy = breakdown.total;
+
+    let mut best_genome = genome.clone();
+    let mut best_breakdown = breakdown.clone();
+    let mut best_energy = energy;
+
+    println!("  Initial energy: {:.0}", energy);
+    println!("\nRunning simulated annealing ({} iterations)...\n", cli.iterations);
+
+    // Progress bar
+    let pb = ProgressBar::new(cli.iterations);
+    pb.set_style(
+        ProgressStyle::with_template(
+            "  {spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) E={msg}"
+        )
+        .unwrap()
+        .progress_chars("█▓▒░  "),
+    );
+
+    let mut temp = cli.temp;
+    let mut accepted = 0u64;
+    let mut iterations = 0u64;
+
+    for it in 0..cli.iterations {
+        if temp < cli.min_temp {
+            iterations = it;
+            break;
         }
-        Commands::Merge { peer_file } => {
-            println!("Loading local optimal genome...");
-            let local_state = load_state("local_optimal.clatin");
-            println!("Loading peer genome from {}...", peer_file);
-            let peer_state = load_state(peer_file);
 
-            println!("Local Energy: {}", local_state.energy_score);
-            println!("Peer Energy: {}", peer_state.energy_score);
+        // Mutate
+        let mut new_genome = genome.clone();
+        mutate(&mut new_genome, &legal_endings, &mut rng);
+        let new_breakdown = compute_energy(&new_genome);
+        let new_energy = new_breakdown.total;
 
-            if peer_state.energy_score < local_state.energy_score {
-                println!("Peer genome is superior! Adopting as new baseline.");
-                save_state(&peer_state, "local_optimal.clatin");
-            } else {
-                println!("Local genome is superior or equal. Rejecting peer genome.");
+        let delta = new_energy - energy;
+
+        if delta < 0.0 || rand::Rng::gen::<f64>(&mut rng) < (-delta / temp).exp() {
+            genome = new_genome;
+            breakdown = new_breakdown;
+            energy = new_energy;
+            accepted += 1;
+
+            if energy < best_energy {
+                best_genome = genome.clone();
+                best_breakdown = breakdown.clone();
+                best_energy = energy;
             }
         }
+
+        temp *= cli.cooling;
+        iterations = it + 1;
+
+        if it % 5000 == 0 {
+            pb.set_position(it);
+            pb.set_message(format!("{:.0}", best_energy));
+        }
     }
+
+    pb.set_position(iterations);
+    pb.set_message(format!("{:.0}", best_energy));
+    pb.finish_with_message(format!("DONE — best energy: {:.0}", best_energy));
+
+    // Output
+    let output = format_output(&best_genome, &best_breakdown, iterations, accepted);
+    let json_out = serde_json::to_string_pretty(&output).expect("Failed to serialize output");
+    fs::write(&cli.output, &json_out)
+        .unwrap_or_else(|e| { eprintln!("Failed to write {}: {}", cli.output, e); std::process::exit(1); });
+    println!("\n  Output written to {}", cli.output);
+
+    print_summary(&best_genome, &best_breakdown, iterations, accepted);
 }
