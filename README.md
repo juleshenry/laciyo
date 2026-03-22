@@ -89,6 +89,43 @@ docs/grammar/
   grammar.tex           Full language specification (~900 lines)
 
 xmls/                   Wiktionary dumps (not tracked in git)
+   1. an      — Aragonese
+   2. ast     — Asturian
+   3. ca      — Catalan
+   4. dlm     — Dalmatian (0 words extracted from incubator)
+   5. eml     — Emiliano-Romagnolo (0 words extracted from incubator)
+   6. en      — English
+   7. es      — Spanish
+   8. ext     — Extremaduran (0 words extracted from incubator)
+   9. fr      — French
+  10. frp     — Franco-Provençal (81 words extracted from incubator)
+  11. fur     — Friulian (37 words extracted from incubator)
+  12. gl      — Galician
+  13. glw     — Gallo (0 words extracted from incubator)
+  14. gsc     — Gascon (0 words extracted from incubator)
+  15. ist     — Istriot (0 words extracted from incubator)
+  16. it      — Italian
+  17. la      — Latin
+  18. lad     — Ladino (88 words extracted from incubator)
+  19. lij     — Ligurian (137 words extracted from incubator)
+  20. lld     — Ladin (0 words extracted from incubator)
+  21. lmo     — Lombard
+  22. mwl     — Mirandese (579 words extracted from incubator)
+  23. nrm     — Norman (2 words extracted from incubator)
+  24. oc      — Occitan
+  25. pcd     — Picard (765 words extracted from incubator)
+  26. pms     — Piedmontese (3068 words extracted from incubator)
+  27. pt      — Portuguese
+  28. rm      — Romansh
+  29. ro      — Romanian
+  30. roa-rup — Aromanian
+  31. ruo     — Istro-Romanian (0 words extracted from incubator)
+  32. sc      — Sardinian
+  33. scn     — Sicilian
+  34. vec     — Venetian
+  35. wa      — Walloon
+
+  *(If you'd like to contribute to these low-resource Romance languages, head over to the [Wikimedia Incubator](https://incubator.wikimedia.org/) and start adding entries!)*
 ```
 
 ## Spec
