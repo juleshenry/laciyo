@@ -16,7 +16,7 @@ import time
 import logging
 import re
 from typing import List, Dict, Optional
-from urllib.parse import urljoin
+from urllib.parse import urljoin, unquote
 import os
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -77,7 +77,7 @@ def extract_morpheme_data(morpheme_url: str) -> Optional[Dict]:
     Scrapes a single morpheme page and extracts form, meaning, etymology, examples.
     """
     full_url = urljoin(WIKTIONARY_BASE, morpheme_url)
-    morpheme_form = morpheme_url.split('/')[-1]
+    morpheme_form = unquote(morpheme_url.split('/')[-1])
     
     logging.info(f"Scraping morpheme: {morpheme_form}")
     

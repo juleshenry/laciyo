@@ -14,3 +14,14 @@ cyberlatin-cli/target/
 Archive/
 Archive.zip
 *.zip
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.pdf
+*.bz2
